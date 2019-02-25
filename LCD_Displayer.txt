@@ -1,0 +1,625 @@
+include HT66F50.inc
+
+ds	.section	'data'
+
+STACK_A		DB		?
+STACK_PSW	DB		?
+COUNT		DB		?
+COUNT1		DB		?
+COUNT2		DB		?
+COUNT3		DB		?
+COUNT4		DB		?
+COUNT5		DB		?
+COUNT6		DB		?
+COUNT7		DB		?
+COUNT8		DB		?
+KEY			DB		?
+KEY_PORT	EQU		PC
+KEY_PORTC	EQU		PCC
+KEY_PORTPU	EQU		PCPU
+DIGIT		DB		5	DUP(?)
+LCM_EN		EQU		PB2
+LCM_ENC		EQU		PBC2
+LCM_RW		EQU		PB3
+LCM_RWC		EQU		PBC3
+LCM_RS		EQU		PB4
+LCM_RSC		EQU		PBC4
+LCM_PORT	EQU		PA
+LCM_PORTC	EQU		PAC
+DEL1  		DB		?
+DEL2  		DB 		?
+DEL3		DB		?
+DC_FLAG		DBIT	
+
+cs	.section	at  000H	'code'
+			ORG		00H
+;===================================
+MAIN:
+			CALL	SETUP
+			CALL	RUN
+			JMP		$
+;===================================
+SETUP		PROC
+			CLR		ACERL
+			MOV		A,08H
+			MOV		CP0C,A
+			MOV		CP1C,A
+			RET
+SETUP		ENDP
+;===================================
+RUN			PROC
+			CALL	INIT_LCM	;設定LCM
+			MOV		A,01H	;全部空白
+			CALL	WLCMC
+			MOV		A,80H	;第一行第一個位置,00H
+			CALL	WLCMC
+			MOV		A,53H	;S
+			CALL	WLCMD
+			MOV		A,30H	;0
+			CALL	WLCMD
+			MOV		A,33H	;3
+			CALL	WLCMD
+			MOV		A,35H	;5
+			CALL	WLCMD
+			MOV		A,32H	;2
+			CALL	WLCMD
+			MOV		A,30H	;0
+			CALL	WLCMD
+			MOV		A,34H	;4
+			CALL	WLCMD
+			MOV		A,31H	;1
+			CALL	WLCMD
+			MOV		A,0C0H	;第二行第一個位置,40H
+			CALL	WLCMC
+			CALL	DELAY
+WAIT_1ST_PRESS:CALL	READ_KEY	;第1個,數字
+			MOV		A,9
+			SUB		A,KEY
+			SNZ		C
+			JMP		$-4
+			MOV		A,KEY
+			MOV		DIGIT[2],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+WAIT_2ND_PRESS:CALL	READ_KEY	;第2個,運算符
+			MOV		A,9
+			SUB		A,KEY
+			SZ		C
+			JMP		TWOxTWO
+			MOV		A,10
+			XOR		A,KEY
+			SZ		Z
+			JMP		ADD_EX	;跳去加法
+			MOV		A,11
+			XOR		A,KEY
+			SZ		Z
+			JMP		SUB_EX	;跳去減法
+			MOV		A,12
+			XOR		A,KEY
+			SZ		Z
+			JMP		MUL_EX	;跳去乘法
+			MOV		A,13
+			XOR		A,KEY
+			SZ		Z
+			JMP		DIV_EX	;跳去除法
+			MOV		A,14
+			XOR		A,KEY
+			SZ		Z
+			JMP		WAIT_2ND_PRESS
+			MOV		A,15
+			XOR		A,KEY
+			SZ		Z
+			JMP		RUN
+			JMP		WAIT_2ND_PRESS
+ADD_EX:		CALL	DELAY
+			MOV		A,2BH	;+
+			CALL	WLCMD
+			CALL	DELAY
+WAIT_3RD_1_PRESS:CALL	READ_KEY	;第3個,數字
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,9
+			SUB		A,KEY
+			SNZ		C
+			JMP		$-9
+			MOV		A,KEY
+			MOV		DIGIT[0],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;按下等號
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,DIGIT[2]
+			ADD		A,DIGIT[0]
+			MOV		COUNT1,A
+			MOV		A,14
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-12
+			MOV		A,3DH	;=
+			CALL	WLCMD
+			CLR		DIGIT[1]
+			CLR		DIGIT[0]
+			INC		DIGIT[0]
+			MOV		A,DIGIT[0]
+			SUB		A,10
+			SNZ		Z
+			JMP		$+3
+			CLR		DIGIT[0]
+			INC		DIGIT[1]
+			SDZ		COUNT1
+			JMP		$-8
+			SZ		DIGIT[1]
+			JMP		$+5
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			JMP		$+8
+			MOV		A,30H
+			ADD		A,DIGIT[1]
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY
+			MOV		A,15
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-4
+			MOV		A,15
+			JMP		RUN
+SUB_EX:		CALL	DELAY
+			MOV		A,2DH	;-
+			CALL	WLCMD
+			CALL	DELAY
+WAIT_3RD_2_PRESS:CALL	READ_KEY	;第3個,數字
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,9
+			SUB		A,KEY
+			SNZ		C
+			JMP		$-9
+			MOV		A,KEY
+			MOV		DIGIT[0],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;按下等號
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,14
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-9
+			MOV		A,3DH	;=
+			CALL	WLCMD
+			CPL		DIGIT[0]
+			INC		DIGIT[0]	;取2補數
+			MOV		A,DIGIT[2]
+			ADD		A,DIGIT[0]
+			MOV		COUNT1,A
+			SNZ		COUNT1.7
+			JMP		$+6
+			CPL		COUNT1
+			INC		COUNT1
+			MOV		A,2DH	;-
+			CALL	WLCMD
+			JMP		$+2
+			CLR		DIGIT[1]
+			MOV		A,14
+			MOV		DIGIT[2],A
+			CLR		DIGIT[0]
+			INC		DIGIT[0]
+			SDZ		COUNT1
+			JMP		$-2
+			SZ		DIGIT[1]
+			JMP		$+5
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			JMP		$+5
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY
+			MOV		A,15
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-4
+			MOV		A,15
+			JMP		RUN
+MUL_EX:		CALL	DELAY
+			MOV		A,2AH	;*
+			CALL	WLCMD
+			CALL	DELAY
+WAIT_3RD_3_PRESS:CALL	READ_KEY	;第3個,數字
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,9
+			SUB		A,KEY
+			SNZ		C
+			JMP		$-9
+			MOV		A,KEY
+			MOV		DIGIT[0],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;按下等號
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,14
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-9
+			MOV		A,3DH	;=
+			CALL	WLCMD
+			CLR		DIGIT[1]
+			SZ		DIGIT[2]
+			JMP		$+2
+			JMP		$+3
+			SZ		DIGIT[0]
+			JMP		$+4
+			CLR		DIGIT[2]
+			CLR		DIGIT[0]
+			JMP		$+17	;=0跳下去顯示答案0
+			MOV		A,DIGIT[0]
+			MOV		COUNT2,A
+			CLR		DIGIT[0]
+			MOV		A,DIGIT[2]
+			MOV		COUNT1,A
+			INC		DIGIT[0]
+			MOV		A,DIGIT[0]
+			SUB		A,10
+			SNZ		Z
+			JMP		$+3
+			CLR		DIGIT[0]
+			INC		DIGIT[1]
+			SDZ		COUNT1
+			JMP		$-8
+			SDZ		COUNT2
+			JMP		$-12
+			MOV		A,14
+			MOV		DIGIT[2],A
+			SZ		DIGIT[1]
+			JMP		$+5
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			JMP		$+7
+			MOV		A,30H
+			ADD		A,DIGIT[1]
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			CALL	READ_KEY
+			MOV		A,15
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-4
+			MOV		A,15
+			JMP		RUN
+DIV_EX:		CALL	DELAY
+			MOV		A,2FH	;/
+			CALL	WLCMD
+			CALL	DELAY
+WAIT_3RD_4_PRESS:CALL	READ_KEY	;第3個,數字
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,9
+			SUB		A,KEY
+			SNZ		C
+			JMP		$-9
+			MOV		A,KEY
+			MOV		DIGIT[0],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;按下等號
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,14
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-9
+			MOV		A,3DH	;=
+			CALL	WLCMD
+			SZ		DIGIT[0]
+			JMP		$+12
+			MOV		A,45H	;E
+			CALL	WLCMD
+			MOV		A,72H	;r
+			CALL	WLCMD
+			MOV		A,72H	;r
+			CALL	WLCMD
+			MOV		A,6FH	;o
+			CALL	WLCMD
+			MOV		A,72H	;r
+			CALL	WLCMD
+			JMP		$+27
+			CLR		COUNT3
+			CLR		COUNT6
+			CLR		DIGIT[1]
+			MOV		A,DIGIT[2]
+			SUB		A,DIGIT[0]
+			SNZ		C
+			JMP		$+7
+			INC		COUNT3
+			SNZ		Z
+			JMP		$-5
+			MOV		A,COUNT3
+			CALL	WLCMD
+			JMP		$+14
+			ADDM	A,DIGIT[0]
+			MOV		A,30H
+			ADD		A,COUNT3
+			CALL	WLCMD
+			MOV		A,2EH	;.
+			CALL	WLCMD
+			MOV		A,2EH	;.
+			CALL	WLCMD
+			MOV		A,2EH	;.
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			CALL	READ_KEY
+			MOV		A,15
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-4
+			MOV		A,15
+			JMP		RUN
+
+TWOxTWO:	MOV		A,KEY
+			MOV		DIGIT[1],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;只能按下乘法
+			MOV		A,12
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$-4
+			MOV		A,2AH	;*
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;第2個數字的十位數
+			MOV		A,9
+			SUB		A,KEY
+			SNZ		C
+			JMP		$-4
+			MOV		A,KEY
+			MOV		DIGIT[0],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;第2個數字的個位數
+			MOV		A,9
+			SUB		A,KEY
+			SNZ		C
+			JMP		$-4
+			MOV		A,KEY
+			MOV		DIGIT[3],A
+			MOV		A,30H
+			ADD		A,KEY
+			CALL	WLCMD
+			CALL	DELAY
+			CALL	READ_KEY	;按下等號
+			MOV		A,15
+			XOR		A,KEY
+			SNZ		Z
+			JMP		$+2
+			JMP		RUN
+			MOV		A,14
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-9
+			MOV		A,3DH	;=
+			CALL	WLCMD
+			MOV		A,10
+			MOV		COUNT7,A
+			CLR		ACC
+			ADD		A,DIGIT[2]
+			SDZ		COUNT7
+			JMP		$-2
+			ADD		A,DIGIT[1]
+			MOV		DIGIT[2],A
+			MOV		A,10
+			MOV		COUNT7,A
+			CLR		ACC
+			ADD		A,DIGIT[0]
+			SDZ		COUNT7
+			JMP		$-2
+			ADD		A,DIGIT[3]
+			MOV		DIGIT[0],A
+			CLR		DIGIT[1]
+			CLR		DIGIT[3]
+			MOV		A,DIGIT[0]
+			MOV		COUNT2,A
+			CLR		DIGIT[0]
+			MOV		A,DIGIT[2]
+			CLR		DIGIT[2]
+			MOV		COUNT8,A
+			MOV		A,COUNT8
+			MOV		COUNT1,A
+			INC		DIGIT[0]
+			MOV		A,DIGIT[0]
+			SUB		A,10
+			SNZ		Z
+			JMP		$+15
+			CLR		DIGIT[0]
+			INC		DIGIT[1]
+			MOV		A,DIGIT[1]
+			SUB		A,10
+			SNZ		Z
+			JMP		$+9
+			CLR		DIGIT[1]
+			INC		DIGIT[2]
+			MOV		A,DIGIT[2]
+			SUB		A,10
+			SNZ		Z
+			JMP		$+3
+			CLR		DIGIT[2]
+			INC		DIGIT[3]
+			SDZ		COUNT1
+			JMP		$-20
+			SDZ		COUNT2
+			JMP		$-24
+			SZ		DIGIT[3]
+			JMP		$+2
+			JMP		$+14
+			MOV		A,30H
+			ADD		A,DIGIT[3]
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[2]
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[1]
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			JMP		$+10
+			MOV		A,30H
+			ADD		A,DIGIT[2]
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[1]
+			CALL	WLCMD
+			MOV		A,30H
+			ADD		A,DIGIT[0]
+			CALL	WLCMD
+			CALL	READ_KEY
+			MOV		A,15
+			SUB		A,KEY
+			SNZ		Z
+			JMP		$-4
+			MOV		A,15
+			JMP		RUN
+RUN			ENDP
+;===================================
+READ_KEY	PROC
+			MOV		A,11110000B
+			MOV		KEY_PORTC,A
+			MOV		KEY_PORTPU,A
+			SET		KEY_PORT
+			CLR		KEY
+			MOV		A,04
+			MOV		COUNT,A
+			CLR		C
+SCAN_KEY:	RLC		KEY_PORT
+			SET		C
+			SNZ		KEY_PORT.4
+			JMP		END_KEY
+			INC		KEY
+			SNZ		KEY_PORT.5
+			JMP		END_KEY
+			INC		KEY
+			SNZ		KEY_PORT.6
+			JMP		END_KEY
+			INC		KEY
+			SNZ		KEY_PORT.7
+			JMP		END_KEY
+			INC		KEY
+			SDZ		COUNT
+			JMP		SCAN_KEY
+END_KEY:	RET
+READ_KEY	ENDP
+;===================================
+INIT_LCM	PROC
+			CLR		LCM_EN
+			CLR		LCM_RW
+			CLR		LCM_RS
+			CLR		LCM_ENC
+			CLR		LCM_RWC
+			CLR		LCM_RSC
+			CALL	DELAY
+			MOV		A,38H
+			CALL   	WLCMC
+			MOV		A,0FH
+			CALL   	WLCMC
+			MOV		A,06H
+			CALL   	WLCMC
+			MOV		A,01H
+			CALL   	WLCMC
+			RET
+INIT_LCM 	ENDP
+;===================================
+WLCMD		PROC
+			SET		DC_FLAG
+			JMP   	$+2
+WLCMC:		CLR		DC_FLAG
+			SET		LCM_PORTC
+			CLR		LCM_RS
+			SET	 	LCM_RW
+			NOP
+			SET	 	LCM_EN
+			NOP
+WF:			SZ		LCM_PORT.7
+			JMP		WF
+			CLR	 	LCM_EN
+			CLR		LCM_PORTC
+			MOV		LCM_PORT,A
+			CLR		LCM_RW
+			CLR		LCM_RS
+			SZ		DC_FLAG
+			SET	 	LCM_RS
+			SET		LCM_EN
+			NOP
+			CLR	 	LCM_EN
+			RET
+WLCMD		ENDP
+;===================================
+DELAY		PROC
+			MOV		A,20
+			MOV		DEL1,A
+DEL_1:  	MOV		A,30
+			MOV		DEL2,A
+DEL_2:		MOV		A,140
+			MOV		DEL3,A
+DEL_3:		SDZ		DEL3
+			JMP		DEL_3
+			SDZ		DEL2
+			JMP		DEL_2
+			SDZ		DEL1
+			JMP		DEL_1
+			RET
+DELAY		ENDP
+			END
